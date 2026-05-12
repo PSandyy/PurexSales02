@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataGate</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- ════════ LOGIN ════════ -->
+<div id="loginScreen" class="screen">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="brand">Data<em>Gate</em></div>
+      <div class="brand-sub">Controlled Excel Access</div>
+      <div class="error-msg" id="loginError"></div>
+      <label>Username</label>
+      <input type="text" id="loginUser" placeholder="username" autocomplete="off">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••">
+      <button class="btn btn-full" id="loginBtn">Sign In →</button>
+      <div class="demo-bar">
+        <b>Demo Accounts</b>
+        <span class="demo-pill" data-u="admin" data-p="admin123">admin / admin123</span>
+        <span class="demo-pill" data-u="alice" data-p="pass123">alice / pass123</span>
+        <span class="demo-pill" data-u="bob"   data-p="pass123">bob / pass123</span>
+        <span class="demo-pill" data-u="carol" data-p="pass123">carol / pass123</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ APP ════════ -->
+<div id="appScreen" class="screen">
+  <header>
+    <div class="h-brand">Data<em>Gate</em></div>
+    <div class="h-right">
+      <div class="user-badge">
+        <span id="hUser"></span>
+        <span class="role-chip" id="hRole"></span>
+      </div>
+      <button class="btn btn-sec btn-sm" id="logoutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <!-- Admin tabs -->
+  <div class="tab-bar" id="adminTabs" style="display:none">
+    <div class="tab active" data-panel="upload">Upload Data</div>
+    <div class="tab" data-panel="users">Manage Users</div>
+    <div class="tab" data-panel="territories">Territories</div>
+    <div class="tab" data-panel="permissions">Permissions</div>
+    <div class="tab" data-panel="preview">Preview</div>
+  </div>
+
+  <!-- User tabs -->
+  <div class="tab-bar" id="userTabs" style="display:none">
+    <div class="tab active" data-panel="mydata">My Data</div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── UPLOAD ── -->
+    <div class="panel" id="panel-upload">
+      <div class="pg-title">Upload Excel File</div>
+      <div class="pg-sub">Upload an .xlsx / .xls / .csv — data is saved to the server database</div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Data Source</div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-icon">📊</div>
+          <div class="upload-text"><strong>Click to upload</strong> or drag & drop</div>
+          <div class="upload-text" style="margin-top:6px;font-size:11px">.xlsx · .xls · .csv</div>
+          <button class="btn" style="margin-top:14px;pointer-events:none">Browse File</button>
+        </div>
+        <div class="file-status" id="fileStatus" style="display:none">
+          <span class="fi-icon">📄</span>
+          <div>
+            <div class="fi-name" id="fileName"></div>
+            <div class="fi-meta" id="fileMeta"></div>
+          </div>
+          <button class="btn btn-danger btn-sm" style="margin-left:auto" id="clearFileBtn">Remove</button>
+        </div>
+      </div>
+
+      <div class="card" id="sheetsCard" style="display:none">
+        <div class="card-title"><span class="dot"></span>Select Sheet</div>
+        <div class="chips-row" id="sheetsGrid"></div>
+        <div class="mt10">
+          <button class="btn btn-green" id="confirmSheetBtn">Confirm Sheet →</button>
+        </div>
+      </div>
+
+      <div class="card" id="previewCard" style="display:none">
+        <div class="row-sb mb10">
+          <div class="card-title" style="margin-bottom:0"><span class="dot"></span>Data Preview</div>
+          <span class="tag tag-p" id="previewCount"></span>
+        </div>
+        <div class="tbl-wrap" style="max-height:280px;overflow-y:auto">
+          <table class="tbl data" id="previewTable"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── USERS ── -->
+    <div class="panel" id="panel-users">
+      <div class="row-sb mb16">
+        <div>
+          <div class="pg-title">Manage Users</div>
+          <div class="pg-sub" style="margin-bottom:0">Create and manage user accounts</div>
+        </div>
+        <button class="btn btn-green" id="addUserBtn">+ Add User</button>
+      </div>
+      <div class="stats-row" id="userStats"></div>
+      <div class="card card-no-pad">
+        <table class="tbl users" id="usersTbl">
+          <thead><tr>
+            <th>Username</th><th>Name</th><th>Role</th>
+            <th>Columns</th><th>Territories</th><th>Filters</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TERRITORIES ── -->
+    <div class="panel" id="panel-territories">
+      <div class="pg-title">Territory Access</div>
+      <div class="pg-sub">Manage territories and assign them to users — works before uploading a sheet</div>
+
+      <div class="two-col">
+        <!-- LEFT -->
+        <div>
+          <div class="card">
+            <div class="row-sb" style="align-items:center;margin-bottom:10px">
+              <div class="card-title" style="margin-bottom:0"><span class="dot"></span>Territory Master List</div>
+              <span class="tag tag-p" id="terrCount"></span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:12px">40 territories pre-loaded. Add custom ones below.</div>
+            <div class="row mb10">
+              <input type="text" id="newTerrInput" placeholder="Add custom territory…" style="margin-bottom:0;flex:1;font-size:12px">
+              <button class="btn btn-green btn-sm" id="addTerrBtn">+ Add</button>
+            </div>
+            <input type="text" id="masterTerrSearch" placeholder="Filter list…" style="margin-bottom:10px;font-size:12px">
+            <div id="masterTerrList" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;padding:4px"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><span class="dot"></span>Map to Sheet Column</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Select which column in your sheet contains territory names</div>
+            <div id="terrNoSheet" style="color:var(--muted);font-size:12px">📂 Upload a sheet first to enable column mapping.</div>
+            <div id="terrColBlock" style="display:none">
+              <div class="row" style="align-items:flex-end;gap:10px">
+                <div style="flex:1"><label>Sheet Column</label><select id="terrColSel"></select></div>
+                <button class="btn btn-green btn-sm" id="terrColSetBtn" style="height:38px">Set →</button>
+              </div>
+              <div id="terrColStatus" style="margin-top:10px;display:none">
+                <span class="tag tag-g" id="terrColBadge"></span>
+                <span style="font-size:11px;color:var(--muted);margin-left:8px">active mapping</span>
+                <button class="btn btn-danger btn-sm" style="margin-left:10px" id="terrColClearBtn">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT -->
+        <div>
+          <div class="card">
+            <div class="card-title"><span class="dot"></span>Assign Territories to User</div>
+            <label>User</label>
+            <select id="terrUserSel" style="margin-bottom:14px"></select>
+
+            <div id="terrUserEditor" style="display:none">
+              <div class="sep" style="margin-top:0"></div>
+              <div class="row-sb mb10" style="align-items:center">
+                <div style="font-size:11px;color:var(--muted)">Editing: <strong style="color:var(--green)" id="terrEditorName"></strong></div>
+                <div class="row" style="gap:8px">
+                  <span class="tag tag-p" id="terrSelCount">0 selected</span>
+                  <span class="link-btn" id="terrAllBtn">All</span>
+                  <span style="color:var(--muted)">/</span>
+                  <span class="link-btn" id="terrNoneBtn">None</span>
+                </div>
+              </div>
+              <input type="text" id="terrSearch" placeholder="Search territories…" style="margin-bottom:10px;font-size:12px">
+              <div class="col-grid" id="terrGrid" style="max-height:320px;overflow-y:auto"></div>
+              <div class="row" style="justify-content:flex-end;gap:10px;margin-top:14px">
+                <button class="btn btn-sec btn-sm" id="terrClearUserBtn">Clear All</button>
+                <button class="btn btn-green" id="terrSaveBtn">Save Territories →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overview -->
+      <div class="card card-no-pad">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border)" class="row-sb">
+          <div class="card-title" style="margin-bottom:0"><span class="dot"></span>Overview — All Users</div>
+          <span class="tag tag-p" id="terrOvCount"></span>
+        </div>
+        <table class="tbl users">
+          <thead><tr><th>User</th><th>Assigned Territories</th><th>Count</th><th></th></tr></thead>
+          <tbody id="terrOvBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── PERMISSIONS ── -->
+    <div class="panel" id="panel-permissions">
+      <div class="pg-title">Set Permissions</div>
+      <div class="pg-sub">Configure column access and row filters per user</div>
+
+      <div class="card" id="permNoSheet" style="display:none">
+        <div class="empty"><div class="ei">📂</div><p>Upload an Excel file first before setting permissions.</p></div>
+      </div>
+
+      <div id="permContent">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Select User</div>
+          <select id="permUserSel"></select>
+        </div>
+        <div id="permEditor" style="display:none">
+          <div class="two-col">
+            <div class="card">
+              <div class="row-sb mb10" style="align-items:center">
+                <div class="card-title" style="margin-bottom:0"><span class="dot"></span>Column Access</div>
+                <div class="row" style="gap:8px">
+                  <span class="link-btn" id="colAllBtn">All</span>
+                  <span style="color:var(--muted)">/</span>
+                  <span class="link-btn" id="colNoneBtn">None</span>
+                </div>
+              </div>
+              <div class="col-grid" id="colGrid"></div>
+            </div>
+            <div class="card">
+              <div class="card-title"><span class="dot"></span>Row Filters</div>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Only show rows where column = exact value</div>
+              <div class="filter-row">
+                <div><label>Column</label><select id="filterCol"></select></div>
+                <div><label>Value</label><input type="text" id="filterVal" placeholder="exact value" style="margin-bottom:0"></div>
+                <button class="btn btn-sm" id="addFilterBtn" style="height:38px">Add</button>
+              </div>
+              <div class="filter-tags" id="filterTags"></div>
+              <div class="sep"></div>
+              <div style="font-size:11px;color:var(--muted)">💡 No filters = all rows (within column access)</div>
+            </div>
+          </div>
+          <div class="row" style="justify-content:flex-end;gap:10px">
+            <button class="btn btn-sec" id="resetPermsBtn">Reset</button>
+            <button class="btn btn-green" id="savePermsBtn">Save Permissions →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PREVIEW ── -->
+    <div class="panel" id="panel-preview">
+      <div class="pg-title">Preview User View</div>
+      <div class="pg-sub">See exactly what each user will see</div>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Select User</div>
+        <select id="previewUserSel"></select>
+      </div>
+      <div id="previewPanel" style="display:none">
+        <div class="user-hdr">
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px" id="pvUserName"></div>
+            <div style="color:var(--muted);font-size:11px;margin-top:3px" id="pvUserMeta"></div>
+          </div>
+          <div class="stats-row" style="margin:0;gap:10px" id="pvStats"></div>
+        </div>
+        <div class="card card-no-pad">
+          <div class="tbl-wrap" style="max-height:380px;overflow-y:auto">
+            <table class="tbl data" id="pvTable"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MY DATA (user) ── -->
+    <div class="panel" id="panel-mydata">
+      <div id="myNoPerms" style="display:none">
+        <div class="empty"><div class="ei">🔒</div><p>No data has been shared with you yet.<br>Contact your administrator.</p></div>
+      </div>
+      <div id="myContent" style="display:none">
+        <div class="user-hdr">
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px" id="myWelcome"></div>
+            <div style="color:var(--muted);font-size:11px;margin-top:3px" id="myMeta"></div>
+          </div>
+          <div class="stats-row" style="margin:0" id="myStats"></div>
+        </div>
+        <div class="terr-chips" id="myTerrChips" style="display:none"></div>
+        <div class="card" style="padding:12px 14px;margin-bottom:14px">
+          <div class="row" style="gap:10px">
+            <div class="search-wrap" style="flex:1">
+              <input type="text" id="mySearch" placeholder="Search within your data…" style="margin-bottom:0">
+            </div>
+            <button class="btn btn-green" id="downloadBtn">⬇ Download Excel</button>
+          </div>
+        </div>
+        <div class="card card-no-pad">
+          <div class="tbl-wrap" style="max-height:480px;overflow-y:auto">
+            <table class="tbl data" id="myTable"></table>
+          </div>
+        </div>
+        <div class="pagination" id="myPagination"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /appScreen -->
+
+<!-- ════════ ADD USER MODAL ════════ -->
+<div class="modal-bg" id="addUserModal">
+  <div class="modal">
+    <button class="modal-x" id="modalClose">✕</button>
+    <div class="modal-title">Add New User</div>
+    <div class="modal-sub">Create an account — set permissions separately</div>
+    <label>Username</label>
+    <input type="text" id="newUsername" placeholder="e.g. john_doe" autocomplete="off">
+    <label>Display Name</label>
+    <input type="text" id="newDisplayName" placeholder="e.g. John Doe">
+    <label>Password</label>
+    <input type="password" id="newPassword" placeholder="min. 6 characters">
+    <div class="modal-foot">
+      <button class="btn btn-sec" id="modalCancelBtn">Cancel</button>
+      <button class="btn btn-green" id="modalSaveBtn">Create User →</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
